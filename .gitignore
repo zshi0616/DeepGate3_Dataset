@@ -1,0 +1,10 @@
+aig
+output
+tmp 
+
+simulator/simulator
+
+*__pycache__
+*.pyc
+.vscode
+.DS_Store
