@@ -88,7 +88,14 @@ int main(int argc, char **argv)
                 q.pop();
                 int gate = node.first;
                 int hop_level = node.second;
-                if (find(visited.begin(), visited.end(), gate) != visited.end()) {
+                bool existed = false; 
+                for (int i=0; i<visited.size(); i++) {
+                    if (visited[i] == gate) {
+                        existed = true;
+                        break;
+                    }
+                }
+                if (existed) {
                     continue;
                 }
                 visited.push_back(gate);
@@ -118,7 +125,14 @@ int main(int argc, char **argv)
                 q.pop();
                 int gate = node.first;
                 int hop_level = node.second;
-                if (find(visited.begin(), visited.end(), gate) != visited.end()) {
+                bool existed = false; 
+                for (int i=0; i<visited.size(); i++) {
+                    if (visited[i] == gate) {
+                        existed = true;
+                        break;
+                    }
+                }
+                if (existed) {
                     continue;
                 }
                 visited.push_back(gate);
