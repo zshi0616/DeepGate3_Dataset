@@ -50,6 +50,9 @@ def get_winhop(g, k_hop=8, analzyer='cone_analyzer/analyzer', graph_filepath='',
         f.write('{} {}\n'.format(g['gate'][idx].item(), g['forward_level'][idx].item()))
     for edge in g['edge_index'].T:
         f.write('{} {}\n'.format(edge[0].item(), edge[1].item()))
+    f.close()
+    while not os.path.exists(graph_filepath):
+        time.sleep(0.1)
         
     # Analyze 
     analyze_cmd = '{} {} {}'.format(analzyer, graph_filepath, res_filepath)
@@ -57,6 +60,7 @@ def get_winhop(g, k_hop=8, analzyer='cone_analyzer/analyzer', graph_filepath='',
     f = open(res_filepath, 'r')
     lines = f.readlines()
     f.close()
+    
     no_hops = int(lines[0].replace('\n', ''))
     all_hop_po = torch.zeros((0, 1), dtype=torch.long)
     all_hop_winlev = torch.zeros((0, 1), dtype=torch.long)
@@ -83,8 +87,8 @@ def get_winhop(g, k_hop=8, analzyer='cone_analyzer/analyzer', graph_filepath='',
     g['winhop_lev'] = all_hop_winlev.numpy()
     g['winhop_nodes'] = all_hop_nodes.numpy()
     g['winhop_nodes_stats'] = all_hop_nodes_stats.numpy()
-    # os.remove(graph_filepath)
-    # os.remove(res_filepath)
+    os.remove(graph_filepath)
+    os.remove(res_filepath)
     
     return g
     
@@ -98,7 +102,7 @@ if __name__ == '__main__':
         for key in circuits[cir_name]:
             g[key] = circuits[cir_name][key]
         
-        g = get_winhop(g, k_hop=args.k_hop, graph_filepath='./tmp/graph.txt', res_filepath='./tmp/res.txt')
+        g = get_winhop(g, k_hop=args.k_hop)
         graphs[cir_name] = copy.deepcopy(g)
         print('Read Circuit:', cir_name)
     
