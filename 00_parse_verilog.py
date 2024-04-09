@@ -10,6 +10,8 @@ import argparse
 from datasets import load_dataset
 from utils.utils import run_command
 
+CSV_PATH = './Verilog_bigquery_GitHub.csv'
+
 def get_parse_args():
     parser = argparse.ArgumentParser()
 
@@ -23,20 +25,20 @@ def process_design_aig(verilog_path, tmp_blif_path, aig_path):
     yosys_cmd = 'yosys -p "read_verilog {}; prep -auto-top; flatten; techmap; write_blif {}"'.format(
         verilog_path, tmp_blif_path
     )
-    stdout, yosys_time = run_command(yosys_cmd, 5)
+    stdout, yosys_time = run_command(yosys_cmd, 3)
     if not os.path.exists(tmp_blif_path):
         return
     
     # Map to AIG
     abc_cmd = 'abc -c "read_blif {}; strash; write_aiger {}"'.format(tmp_blif_path, aig_path)
-    stdout, abc_time = run_command(abc_cmd, 5)
+    stdout, abc_time = run_command(abc_cmd, 3)
     print('Time: Yosys {:.2f}s, ABC {:.2f}s'.format(yosys_time, abc_time))
     
     os.remove(tmp_blif_path)
 
 if __name__ == '__main__':
     args = get_parse_args()
-    ds = load_dataset('csv', data_files='/Users/zhengyuanshi/studio/LCM_Dataset/Verilog_bigquery_GitHub.csv')
+    ds = load_dataset('csv', data_files=CSV_PATH)
     print(next(iter(ds)))
     
     for cir_idx in range(len(ds['train']['text'])):

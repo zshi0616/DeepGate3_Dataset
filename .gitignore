@@ -1,9 +1,17 @@
 aig
+*_aig
+npz
 output
 tmp 
-*.zip
+dataset
+raw_data
 
 simulator/simulator
+simulator/*.txt
+
+*.npz
+*.zip
+*.csv
 
 *__pycache__
 *.pyc

@@ -15,6 +15,7 @@ import networkx as nx
 from utils.utils import hash_arr, run_command
 import deepgate as dg
 import time
+import threading
 
 def remove_unconnected(x_data, edge_index):
     new_x_data = []
@@ -417,7 +418,7 @@ def rename_node(x_data):
         x_data: list(list(xx)), the node feature matrix
     '''
     for idx, x_data_info in enumerate(x_data):
-        x_data_info[0] = idx
+        x_data[idx][0] = int(idx)
     return x_data
 
 def circuit_extraction(x_data, adj, circuit_depth, num_nodes, sub_circuit_size=25):
@@ -1386,12 +1387,12 @@ def prepare_dg2_labels_cpp(g, no_patterns=15000,
                            graph_filepath='', 
                            res_filepath=''):
     if graph_filepath == '':
-        graph_filepath = 'tmp_graph_{}_{}.txt'.format(
-            time.strftime("%Y%m%d-%H%M%S"), random.randint(0, 1000)
+        graph_filepath = './tmp/tmp_graph_{}_{}_{}.txt'.format(
+            time.strftime("%Y%m%d-%H%M%S"), threading.currentThread().ident, random.randint(0, 1000)
         )
     if res_filepath == '':
-        res_filepath = 'tmp_res_{}_{}.txt'.format(
-            time.strftime("%Y%m%d-%H%M%S"), random.randint(0, 1000)
+        res_filepath = './tmp/tmp_res_{}_{}_{}.txt'.format(
+            time.strftime("%Y%m%d-%H%M%S"), threading.currentThread().ident, random.randint(0, 1000)
         )
     # Parse graph 
     PI_index = g['forward_index'][(g['forward_level'] == 0) & (g['backward_level'] != 0)]
@@ -1442,7 +1443,9 @@ def prepare_dg2_labels_cpp(g, no_patterns=15000,
         prob[int(arr[0])] = float(arr[1])
     tt_index = []
     tt_sim = []
-    for line in lines[no_nodes:]:
+    # TT pairs 
+    no_tt_pairs = int(lines[no_nodes].replace('\n', '').split(' ')[1])
+    for line in lines[no_nodes+1:no_nodes+1+no_tt_pairs]:
         arr = line.replace('\n', '').split(' ')
         assert len(arr) == 3
         tt_index.append([int(arr[0]), int(arr[1])])
@@ -1452,11 +1455,23 @@ def prepare_dg2_labels_cpp(g, no_patterns=15000,
     tt_sim = torch.tensor(tt_sim)
     prob = torch.tensor(prob)
     
+    # Connection pairs 
+    no_connection_pairs = int(lines[no_nodes+1+no_tt_pairs].replace('\n', '').split(' ')[1])
+    con_index = []
+    con_label = []
+    for line in lines[no_nodes+2+no_tt_pairs: no_nodes+2+no_tt_pairs+no_connection_pairs]:
+        arr = line.replace('\n', '').split(' ')
+        assert len(arr) == 3
+        con_index.append([int(arr[0]), int(arr[1])])
+        con_label.append(int(arr[2]))
+    con_index = torch.tensor(con_index)
+    con_label = torch.tensor(con_label)
+    
     # Remove 
     os.remove(graph_filepath)
     os.remove(res_filepath)
     
-    return prob, tt_index, tt_sim
+    return prob, tt_index, tt_sim, con_index, con_label
 
 def get_connection_pairs(x_data, edge_index, forward_level, no_src=512, no_dst=512, cone=None):
     no_nodes = len(x_data)

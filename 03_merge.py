@@ -3,9 +3,9 @@ import os
 import copy 
 from deepgate.utils.data_utils import read_npz_file
 
-npz_dir = './output'
+npz_dir = './npz'
 npz_list = [
-    '01', '02', '03'
+    'dg_01'
 ]
 output_dir = './graphs.npz'
 
