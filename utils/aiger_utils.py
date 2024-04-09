@@ -236,15 +236,22 @@ def seqaig_to_xdata(aig_filename, tmp_aag_filename='', gate_to_index={'PI': 0, '
     os.remove(tmp_aag_filename)
     
     header = lines[0].strip().split(" ")
-    if len(header) != 7:
+    if len(header) == 7:
+        # “M”, “I”, “L”, “O”, “A” separated by spaces.
+        n_variables = eval(header[1])
+        n_inputs = eval(header[2])
+        n_latch = eval(header[3])
+        unknown = eval(header[4])
+        n_and = eval(header[5])
+        n_outputs = eval(header[6])
+    elif len(header) == 6:
+        n_variables = eval(header[1])
+        n_inputs = eval(header[2])
+        n_outputs = eval(header[4])
+        n_and = eval(header[5])
+        n_latch = eval(header[3])
+    else:
         return [], []
-    # “M”, “I”, “L”, “O”, “A” separated by spaces.
-    n_variables = eval(header[1])
-    n_inputs = eval(header[2])
-    n_latch = eval(header[3])
-    unknown = eval(header[4])
-    n_and = eval(header[5])
-    n_outputs = eval(header[6])
     
     # if n_outputs != 1 or n_variables != (n_inputs + n_and) or n_variables == n_inputs:
     #     return [], []
@@ -321,6 +328,17 @@ def seqaig_to_xdata(aig_filename, tmp_aag_filename='', gate_to_index={'PI': 0, '
                 not_index = len(x_data) - 1
                 edge_index.append([po_index, not_index])
                 has_not[po_index] = not_index
+                
+    # Remove Constraints 
+    const_idx = -1
+    for edge_idx, edge in enumerate(edge_index):
+        if edge[0] == -1:
+            if const_idx == -1:
+                const_idx = len(x_data)
+                x_data.append([len(x_data), gate_to_index['PI']])
+                edge_index[edge_idx][0] = const_idx
+            else:
+                edge_index[edge_idx][0] = const_idx
 
     return x_data, edge_index
 

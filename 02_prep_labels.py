@@ -18,7 +18,8 @@ NODE_CONNECT_SAMPLE_RATIO = 0.1
 NO_NODE_PATH = 10
 NO_NODE_HOP = 10
 K_HOP = 4
-AIG_FOLDER = './aig'
+
+NO_NODES = [30, 5000]
 
 def get_parse_args():
     parser = argparse.ArgumentParser()
@@ -27,8 +28,11 @@ def get_parse_args():
     parser.add_argument('--start', default=0, type=int)
     parser.add_argument('--end', default=100000, type=int)
     
+    # Input
+    parser.add_argument('--aig_dir', default='./dg_aig', type=str)
+    
     # Output
-    parser.add_argument('--npz_path', default='./output/graphs.npz', type=str)
+    parser.add_argument('--npz_path', default='./npz/graphs.npz', type=str)
     
     args = parser.parse_args()
     
@@ -82,31 +86,112 @@ class OrderedData(Data):
         else:
             return 0
 
+def get_winhop(g, k_hop=8):
+    graph = {}
+    max_level = g['forward_level'].max()
+    forward_level = g['forward_level'].numpy()
+    backward_level = g['backward_level'].numpy()
+    level_list = [[] for _ in range(max_level+1)]
+    for idx in range(len(x_data)):
+        level_list[forward_level[idx]].append(idx)
+    po_list = forward_index[backward_level == 0]
+    
+    all_hop_po = torch.zeros((0, 1), dtype=torch.long)
+    all_hop_winlev = torch.zeros((0, 1), dtype=torch.long)
+    max_hop_nodes_cnt = 0
+    for k in range(k_hop+1):
+        max_hop_nodes_cnt += 2**k
+    all_hop_nodes = torch.zeros((0, max_hop_nodes_cnt), dtype=torch.long)
+    all_hop_nodes_stats = torch.zeros((0, max_hop_nodes_cnt), dtype=torch.long)
+    
+    edge_index = g['edge_index']
+    gate = g['gate']
+    # edge_index = torch.tensor(g['edge_index'], dtype=torch.long)
+    # gate = torch.tensor(g['gate'], dtype=torch.long)
+    has_hop = [0] * len(x_data)
+    hop_level = k_hop
+    hop_winlev = 0
+    while hop_level < max_level:
+        for idx in level_list[hop_level]:
+            hop_nodes, hop_gates, hop_pis, hop_pos = circuit_utils.get_hops(idx, edge_index, x_data, gate, k_hop=k_hop)
+            if len(hop_gates) < 2:
+                continue
+            has_hop[idx] = 1
+            
+            # Record hop
+            all_hop_po = torch.cat([all_hop_po, hop_pos.view(1, -1)], dim=0)
+            assert len(hop_nodes) <= max_hop_nodes_cnt
+            hop_nodes_stats = torch.ones(len(hop_nodes), dtype=torch.long)
+            hop_nodes = F.pad(hop_nodes, (0, max_hop_nodes_cnt - len(hop_nodes)), value=-1)
+            hop_nodes_stats = F.pad(hop_nodes_stats, (0, max_hop_nodes_cnt - len(hop_nodes_stats)), value=0)
+            all_hop_nodes = torch.cat([all_hop_nodes, hop_nodes.view(1, -1)], dim=0)
+            all_hop_nodes_stats = torch.cat([all_hop_nodes_stats, hop_nodes_stats.view(1, -1)], dim=0)
+            all_hop_winlev = torch.cat([all_hop_winlev, torch.tensor([hop_winlev]).view(1, -1)], dim=0)
+            
+        hop_level += (k_hop - 2)
+        hop_winlev += 1
+    
+    # Add PO 
+    for po_idx in po_list:
+        if has_hop[po_idx] == 0:
+            hop_nodes, hop_gates, hop_pis, hop_pos = circuit_utils.get_hops(idx, edge_index, x_data, gate, k_hop=k_hop)
+            if len(hop_gates) < 2:
+                continue
+            has_hop[idx] = 1
+            
+            # Record hop
+            all_hop_po = torch.cat([all_hop_po, hop_pos.view(1, -1)], dim=0)
+            assert len(hop_nodes) <= max_hop_nodes_cnt
+            hop_nodes_stats = torch.ones(len(hop_nodes), dtype=torch.long)
+            hop_nodes = F.pad(hop_nodes, (0, max_hop_nodes_cnt - len(hop_nodes)), value=-1)
+            hop_nodes_stats = F.pad(hop_nodes_stats, (0, max_hop_nodes_cnt - len(hop_nodes_stats)), value=0)
+            all_hop_nodes = torch.cat([all_hop_nodes, hop_nodes.view(1, -1)], dim=0)
+            all_hop_nodes_stats = torch.cat([all_hop_nodes_stats, hop_nodes_stats.view(1, -1)], dim=0)
+            all_hop_winlev = torch.cat([all_hop_winlev, torch.tensor([hop_winlev]).view(1, -1)], dim=0)
+    graph = {
+        'winhop_po': all_hop_po.numpy(),
+        'winhop_nodes': all_hop_nodes.numpy(),
+        'winhop_nodes_stats': all_hop_nodes_stats.numpy(), 
+        'winhop_lev': all_hop_winlev.numpy()
+    }
+    g.update(graph)
+    return g
+
 if __name__ == '__main__':
     args = get_parse_args()
-    aig_files = glob.glob('{}/*.aig'.format(AIG_FOLDER))
-    aig_namelist = []
-    for aig_file in aig_files:
-        aig_namelist.append(aig_file)
+    
+    aig_namelist_path = os.path.join(args.aig_dir, 'aig_namelist.txt')
+    if not os.path.exists(aig_namelist_path):
+        aig_files = glob.glob('{}/*.aig'.format(args.aig_dir))
+        aig_namelist = []
+        for aig_file in aig_files:
+            aig_name = os.path.basename(aig_file).replace('.aig', '')
+            aig_namelist.append(aig_name)
+        with open(aig_namelist_path, 'w') as f:
+            for aig_name in aig_namelist:
+                f.write(aig_name + '\n')
+    else:
+        with open(aig_namelist_path, 'r') as f:
+            aig_namelist = f.readlines()
+            aig_namelist = [x.strip() for x in aig_namelist]
     
     aig_namelist = aig_namelist[args.start: args.end]
     no_circuits = len(aig_namelist)
     tot_time = 0
     graphs = {}
-    for aig_idx, aig_file in enumerate(aig_namelist):
-        cir_name = aig_file.split('/')[-1].split('.')[0]
-        # if cir_name != '72361':
+    for aig_idx, cir_name in enumerate(aig_namelist):
+        aig_file = os.path.join(args.aig_dir, cir_name + '.aig')
+        # if cir_name != 'trans_35765_2':
         #     continue
         
         start_time = time.time()
-        print('Parse: {} ({:} / {:}), Time: {:.2f}s, ETA: {:.2f}s'.format(
-            cir_name, aig_idx, no_circuits, 
-            tot_time, tot_time / ((aig_idx + 1) / no_circuits)
-        ))
         tmp_aag_filename = os.path.join('./tmp', cir_name + '.aag')
         x_data, edge_index = aiger_utils.seqaig_to_xdata(aig_file, tmp_aag_filename)
-        if len(edge_index) == 0 or len(x_data) < 30:
-            continue
+        print('Parse: {} ({:} / {:}), Size: {:}, Time: {:.2f}s, ETA: {:.2f}s, Succ: {:}'.format(
+            cir_name, aig_idx, no_circuits, len(x_data), 
+            tot_time, tot_time / ((aig_idx + 1) / no_circuits) - tot_time, 
+            len(graphs)
+        ))
         fanin_list, fanout_list = circuit_utils.get_fanin_fanout(x_data, edge_index)
         
         # Replace DFF as PPI and PPO
@@ -126,13 +211,11 @@ if __name__ == '__main__':
             for fanin_idx in fanin_list[idx]:
                 edge_index.append([fanin_idx, idx])
         x_data, edge_index = circuit_utils.remove_unconnected(x_data, edge_index)
-        if len(edge_index) == 0:
-            continue 
+        if len(edge_index) == 0 or len(x_data) < NO_NODES[0] or len(x_data) > NO_NODES[1]:
+            continue
         x_one_hot = dg.construct_node_feature(x_data, 3)
         edge_index = torch.tensor(edge_index, dtype=torch.long).t().contiguous()
         forward_level, forward_index, backward_level, backward_index = dg.return_order_info(edge_index, x_one_hot.size(0))
-        if ((forward_level == 0) & (backward_level == 0)).sum() > 0:
-            continue
         
         graph = OrderedData()
         graph.x = x_one_hot
@@ -147,7 +230,9 @@ if __name__ == '__main__':
         ################################################
         # DeepGate2 (node-level) labels
         ################################################
-        prob, tt_pair_index, tt_sim = circuit_utils.prepare_dg2_labels_cpp(graph, 15000)
+        prob, tt_pair_index, tt_sim, con_index, con_label = circuit_utils.prepare_dg2_labels_cpp(graph, 15000)
+        graph.connect_pair_index = con_index.T
+        graph.connect_label = con_label
         
         assert max(prob).item() <= 1.0 and min(prob).item() >= 0.0
         if len(tt_pair_index) == 0:
@@ -158,13 +243,13 @@ if __name__ == '__main__':
         graph.tt_pair_index = tt_pair_index
         graph.tt_sim = tt_sim
                 
-        connect_pair_index, connect_label = circuit_utils.get_connection_pairs(
-            x_data, edge_index, forward_level, 
-            no_src=int(len(x_data)*NODE_CONNECT_SAMPLE_RATIO), no_dst=int(len(x_data)*NODE_CONNECT_SAMPLE_RATIO),
-            cone=None
-        )
-        graph.connect_pair_index = connect_pair_index.T
-        graph.connect_label = connect_label
+        # connect_pair_index, connect_label = circuit_utils.get_connection_pairs(
+        #     x_data, edge_index, forward_level, 
+        #     no_src=int(len(x_data)*NODE_CONNECT_SAMPLE_RATIO), no_dst=int(len(x_data)*NODE_CONNECT_SAMPLE_RATIO),
+        #     cone=None
+        # )
+        # graph.connect_pair_index = connect_pair_index.T
+        # graph.connect_label = connect_label
         
         ################################################
         # Path-level labels    
@@ -281,7 +366,10 @@ if __name__ == '__main__':
         graph.hop_levs = torch.tensor(all_hop_level_cnt, dtype=torch.long)
         graph.hop_forward_index = torch.tensor(range(len(all_hop_nodes)), dtype=torch.long)
         
-        hop_pair_index, hop_pair_ged, hop_pair_tt_sim = circuit_utils.get_hop_pair_labels(all_hop_nodes, graph.hop_tt, edge_index, no_pairs=int(len(all_hop_nodes) * 0.1))
+        hop_pair_index, hop_pair_ged, hop_pair_tt_sim = circuit_utils.get_hop_pair_labels(
+            all_hop_nodes, graph.hop_tt, edge_index, 
+            no_pairs=min(int(len(all_hop_nodes) * len(all_hop_nodes) * 0.1), 100)
+        )
         no_pairs = len(hop_pair_index)
         if no_pairs == 0:
             continue
@@ -309,6 +397,9 @@ if __name__ == '__main__':
         graph.ninh_hop_index = ninh_hop_index
         graph.ninh_labels = node_hop_labels
         
+        # Win hop
+        graph = get_winhop(graph, k_hop=8)
+        
         # Statistics
         graph.no_nodes = len(x_data)
         graph.no_edges = len(edge_index[0])
@@ -331,4 +422,3 @@ if __name__ == '__main__':
     np.savez_compressed(args.npz_path, circuits=graphs)
     print(args.npz_path)
     print(len(graphs))
-        
