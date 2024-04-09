@@ -1,6 +1,7 @@
 aig
 output
 tmp 
+*.zip
 
 simulator/simulator
 
