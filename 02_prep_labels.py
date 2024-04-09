@@ -134,10 +134,10 @@ def get_winhop(g, k_hop=8):
     # Add PO 
     for po_idx in po_list:
         if has_hop[po_idx] == 0:
-            hop_nodes, hop_gates, hop_pis, hop_pos = circuit_utils.get_hops(idx, edge_index, x_data, gate, k_hop=k_hop)
+            hop_nodes, hop_gates, hop_pis, hop_pos = circuit_utils.get_hops(po_idx, edge_index, x_data, gate, k_hop=k_hop)
             if len(hop_gates) < 2:
                 continue
-            has_hop[idx] = 1
+            has_hop[po_idx] = 1
             
             # Record hop
             all_hop_po = torch.cat([all_hop_po, hop_pos.view(1, -1)], dim=0)
@@ -181,7 +181,7 @@ if __name__ == '__main__':
     graphs = {}
     for aig_idx, cir_name in enumerate(aig_namelist):
         aig_file = os.path.join(args.aig_dir, cir_name + '.aig')
-        # if cir_name != 'trans_35765_2':
+        # if cir_name != '9848':
         #     continue
         
         start_time = time.time()
