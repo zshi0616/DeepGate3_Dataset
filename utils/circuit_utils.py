@@ -1314,7 +1314,7 @@ def get_fanin_fanout_cone(g, max_no_nodes=512):
     backward_level_list = [[] for I in range(g['backward_level'].max()+1)]
     fanin_list = [[] for _ in range(no_nodes)]
     fanout_list = [[] for _ in range(no_nodes)]
-    for edge in g['edge_index'].t():
+    for edge in g['edge_index'].T:
         fanin_list[edge[1].item()].append(edge[0].item())
         fanout_list[edge[0].item()].append(edge[1].item())
     for k, idx in enumerate(g['forward_index']):
@@ -1472,6 +1472,57 @@ def prepare_dg2_labels_cpp(g, no_patterns=15000,
     os.remove(res_filepath)
     
     return prob, tt_index, tt_sim, con_index, con_label
+
+def prepare_workload_prob(g, no_patterns=15000, 
+                           simulator='./simulator/wl_simulator', 
+                           graph_filepath='', 
+                           res_filepath=''):
+    if graph_filepath == '':
+        graph_filepath = './tmp/tmp_graph_{}_{}_{}.txt'.format(
+            time.strftime("%Y%m%d-%H%M%S"), threading.currentThread().ident, random.randint(0, 1000)
+        )
+    if res_filepath == '':
+        res_filepath = './tmp/tmp_res_{}_{}_{}.txt'.format(
+            time.strftime("%Y%m%d-%H%M%S"), threading.currentThread().ident, random.randint(0, 1000)
+        )
+    # Parse graph 
+    PI_index = g['forward_index'][(g['forward_level'] == 0) & (g['backward_level'] != 0)]
+    no_pi = len(PI_index)
+    no_nodes = len(g['forward_index'])
+    level_list = [[] for I in range(g['forward_level'].max()+1)]
+    fanin_list = [[] for _ in range(no_nodes)]
+    for edge in g['edge_index'].T:
+        fanin_list[edge[1].item()].append(edge[0].item())
+    for k, idx in enumerate(g['forward_index']):
+        level_list[g['forward_level'][k].item()].append(k)
+    
+    # Write graph to file
+    f = open(graph_filepath, 'w')
+    f.write('{} {} {} {}\n'.format(no_nodes, len(g['edge_index'][0]), no_pi, no_patterns))
+    for idx in range(no_nodes):
+        f.write('{} {}\n'.format(g['gate'][idx].item(), g['forward_level'][idx].item()))
+    for edge in g['edge_index'].T:
+        f.write('{} {}\n'.format(edge[0].item(), edge[1].item()))
+    for pi in PI_index:
+        f.write('{} {}\n'.format(pi.item(), random.random()))
+    f.close()
+    
+    # Simulation  
+    sim_cmd = '{} {} {}'.format(simulator, graph_filepath, res_filepath)
+    stdout, exec_time = run_command(sim_cmd)
+    f = open(res_filepath, 'r')
+    lines = f.readlines()
+    f.close()
+    prob = [-1] * no_nodes
+    for line in lines[:no_nodes]:
+        arr = line.replace('\n', '').split(' ')
+        prob[int(arr[0])] = float(arr[1])
+    
+    # Remove 
+    os.remove(graph_filepath)
+    os.remove(res_filepath)
+    
+    return prob
 
 def get_connection_pairs(x_data, edge_index, forward_level, no_src=512, no_dst=512, cone=None):
     no_nodes = len(x_data)

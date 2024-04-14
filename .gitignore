@@ -7,6 +7,7 @@ dataset
 raw_data
 
 simulator/simulator
+simulator/wl_simulator
 simulator/*.txt
 cone_analyzer/analyzer
 cone_analyzer/*.txt
