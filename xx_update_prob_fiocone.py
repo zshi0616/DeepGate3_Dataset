@@ -16,11 +16,8 @@ def get_parse_args():
     parser = argparse.ArgumentParser(description='WinHop Analyzer')
     
     # Input / Output 
-    parser.add_argument('--input_npz', type=str, default='./dataset/test.npz', help='Input NPZ file path')
-    parser.add_argument('--output_npz', type=str, default='./dataset/output.npz', help='Output NPZ file path')
-    
-    # Parameters 
-    parser.add_argument('--k_hop', type=int, default=8, help='Number of hops')
+    parser.add_argument('--input_npz', type=str, default='./dataset/4_hop.npz', help='Input NPZ file path')
+    parser.add_argument('--output_npz', type=str, default='./dataset/wl_4_hop.npz', help='Output NPZ file path')
     
     args = parser.parse_args()
     return args
@@ -57,7 +54,7 @@ if __name__ == '__main__':
         
         tot_time += time.time() - start_time
     
-    # np.savez(args.output_npz, circuits=graphs)
+    np.savez(args.output_npz, circuits=graphs)
     print(args.output_npz)
     print(len(graphs))
             
