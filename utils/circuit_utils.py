@@ -1385,7 +1385,8 @@ def get_fanin_fanout_cone(g, max_no_nodes=512):
 def prepare_dg2_labels_cpp(g, no_patterns=15000, 
                            simulator='./simulator/simulator', 
                            graph_filepath='', 
-                           res_filepath=''):
+                           res_filepath='', 
+                           fast=False):
     if graph_filepath == '':
         graph_filepath = './tmp/tmp_graph_{}_{}_{}.txt'.format(
             time.strftime("%Y%m%d-%H%M%S"), threading.currentThread().ident, random.randint(0, 1000)
@@ -1456,16 +1457,17 @@ def prepare_dg2_labels_cpp(g, no_patterns=15000,
     prob = torch.tensor(prob)
     
     # Connection pairs 
-    no_connection_pairs = int(lines[no_nodes+1+no_tt_pairs].replace('\n', '').split(' ')[1])
     con_index = []
     con_label = []
-    for line in lines[no_nodes+2+no_tt_pairs: no_nodes+2+no_tt_pairs+no_connection_pairs]:
-        arr = line.replace('\n', '').split(' ')
-        assert len(arr) == 3
-        con_index.append([int(arr[0]), int(arr[1])])
-        con_label.append(int(arr[2]))
-    con_index = torch.tensor(con_index)
-    con_label = torch.tensor(con_label)
+    if not fast:
+        no_connection_pairs = int(lines[no_nodes+1+no_tt_pairs].replace('\n', '').split(' ')[1])
+        for line in lines[no_nodes+2+no_tt_pairs: no_nodes+2+no_tt_pairs+no_connection_pairs]:
+            arr = line.replace('\n', '').split(' ')
+            assert len(arr) == 3
+            con_index.append([int(arr[0]), int(arr[1])])
+            con_label.append(int(arr[2]))
+        con_index = torch.tensor(con_index)
+        con_label = torch.tensor(con_label)
     
     # Remove 
     os.remove(graph_filepath)
@@ -1601,7 +1603,9 @@ def get_hop_pair_labels(hop_nodes_list, hop_tt, edge_index, no_pairs):
                     g1.add_edge(edge[0].item(), edge[1].item())
                 if edge[0] in hop_nodes_list[pair[1]] and edge[1] in hop_nodes_list[pair[1]]:
                     g2.add_edge(edge[0].item(), edge[1].item())
-            ged = nx.graph_edit_distance(g1, g2, timeout=0.1)
+            ged = nx.graph_edit_distance(g1, g2, timeout=0.01)
+            if ged == None:
+                ged = 0
             ged = ged / max(len(hop_nodes_list[pair[0]]), len(hop_nodes_list[pair[1]]))
             ged = min(ged, 1.0)
         

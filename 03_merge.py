@@ -3,11 +3,11 @@ import os
 import copy 
 from deepgate.utils.data_utils import read_npz_file
 
-npz_dir = './npz'
+npz_dir = './QoR_Design'
 npz_list = [
-    'dg_01'
+    '0427', '0427_02'
 ]
-output_dir = './graphs.npz'
+output_dir = './QoR_Design/graphs.npz'
 
 if __name__ == '__main__':
     graphs = {}

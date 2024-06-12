@@ -13,8 +13,8 @@ def get_parse_args():
     parser = argparse.ArgumentParser(description='WinHop Analyzer')
     
     # Input / Output 
-    parser.add_argument('--input_npz', type=str, default='./dataset/only_graph.npz', help='Input NPZ file path')
-    parser.add_argument('--output_npz', type=str, default='./dataset/output.npz', help='Output NPZ file path')
+    parser.add_argument('--input_npz', type=str, default='./QoR_Design_Test/graphs.npz', help='Input NPZ file path')
+    parser.add_argument('--output_npz', type=str, default='./QoR_Design_Test/graphs_hop.npz', help='Output NPZ file path')
     
     # Parameters 
     parser.add_argument('--k_hop', type=int, default=8, help='Number of hops')

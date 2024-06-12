@@ -5,6 +5,12 @@ output
 tmp 
 dataset
 raw_data
+large
+
+# Dataset
+QoR*
+lec
+hop_*
 
 simulator/simulator
 simulator/wl_simulator

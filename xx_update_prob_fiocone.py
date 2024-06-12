@@ -19,6 +19,9 @@ def get_parse_args():
     parser.add_argument('--input_npz', type=str, default='./dataset/4_hop.npz', help='Input NPZ file path')
     parser.add_argument('--output_npz', type=str, default='./dataset/wl_4_hop.npz', help='Output NPZ file path')
     
+    # Max count 
+    parser.add_argument('--max_cnt', type=int, default=-1)
+    
     args = parser.parse_args()
     return args
 
@@ -34,6 +37,9 @@ if __name__ == '__main__':
             tot_time, tot_time / ((cir_idx + 1) / no_circuits) - tot_time, 
             len(graphs)
         ))
+        
+        if args.max_cnt > 0 and cir_idx >= args.max_cnt:
+            break
         
         start_time = time.time()
         g = {}
